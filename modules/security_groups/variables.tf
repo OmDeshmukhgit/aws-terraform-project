@@ -19,20 +19,15 @@ variable "tags" {
   default     = {}
 }
 
-variable "allowed_ssh_cidr" {
-  description = "CIDR blocks allowed for SSH access"
-  type        = list(string)
-  default     = ["0.0.0.0/0"] 
-}
-
-variable "allowed_http_cidr" {
-  description = "CIDR blocks allowed for HTTP access"
-  type        = list(string)
-  default     = ["0.0.0.0/0"]
-}
-
-variable "allowed_https_cidr" {
-  description = "CIDR blocks allowed for HTTPS access"
-  type        = list(string)
-  default     = ["0.0.0.0/0"]
+variable "web_ingress_rules" {
+  description = "Ingress rules for the web SG. SSH removed by default now that SSM Session Manager is the primary access path - add it back per-environment only if you specifically need SSH."
+  type = map(object({
+    port        = number
+    protocol    = string
+    cidr_blocks = list(string)
+  }))
+  default = {
+    http  = { port = 80,  protocol = "tcp", cidr_blocks = ["0.0.0.0/0"] }
+    https = { port = 443, protocol = "tcp", cidr_blocks = ["0.0.0.0/0"] }
+  }
 }

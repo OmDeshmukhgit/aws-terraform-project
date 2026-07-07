@@ -9,7 +9,7 @@ resource "aws_s3_bucket" "main" {
   })
 }
 
-# Enable Versioning (FREE)
+# Enable Versioning 
 resource "aws_s3_bucket_versioning" "main" {
   bucket = aws_s3_bucket.main.id
 
@@ -18,7 +18,7 @@ resource "aws_s3_bucket_versioning" "main" {
   }
 }
 
-# Enable Encryption (FREE - AES256)
+# Enable Encryption 
 resource "aws_s3_bucket_server_side_encryption_configuration" "main" {
   bucket = aws_s3_bucket.main.id
 
@@ -29,7 +29,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "main" {
   }
 }
 
-# Block Public Access (FREE - security best practice)
+# Block Public Access 
 resource "aws_s3_bucket_public_access_block" "main" {
   bucket = aws_s3_bucket.main.id
 
@@ -37,4 +37,13 @@ resource "aws_s3_bucket_public_access_block" "main" {
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "this" {
+  bucket = aws_s3_bucket.main.id
+  rule {
+    id     = "expire-noncurrent-versions"
+    status = "Enabled"
+    noncurrent_version_expiration { noncurrent_days = 90 }
+  }
 }

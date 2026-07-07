@@ -17,32 +17,8 @@ module "security_groups" {
   environment  = var.environment
   project_name = var.project_name
   tags         = var.tags
+  web_ingress_rules = var.web_ingress_rules
 
-  allowed_ssh_cidr   = ["0.0.0.0/0"] # ⚠️ Open to world, restrict in prod
-  allowed_http_cidr  = ["0.0.0.0/0"]
-  allowed_https_cidr = ["0.0.0.0/0"]
-}
-
-# EC2 Module
-module "ec2" {
-  source        = "./modules/ec2"
-  ami           = var.ami
-  instance_type = var.instance_type
-  environment   = var.environment
-  project_name  = var.project_name
-  tags          = var.tags
-
-  subnet_id          = module.vpc.public_subnet_ids[0]
-  security_group_ids = [module.security_groups.web_security_group_id]
-  key_pair_name      = "" # supply if you want SSH access
-
-  user_data_script = <<-EOF
-    #!/bin/bash
-    yum update -y
-    yum install -y nginx
-    systemctl start nginx
-    systemctl enable nginx
-  EOF
 }
 
 # S3 Module
@@ -52,4 +28,67 @@ module "s3" {
   environment  = var.environment
   project_name = var.project_name
   tags         = var.tags
+}
+
+#alb module
+module "alb" {
+  source = "./modules/alb"
+
+  project_name = var.project_name
+  environment  = var.environment
+  tags         = var.tags
+
+  vpc_id            = module.vpc.vpc_id
+  public_subnet_ids = module.vpc.public_subnet_ids
+
+  target_port        = 80
+  health_check_path  = "/"
+  allowed_http_cidr  = ["0.0.0.0/0"]
+  allowed_https_cidr = ["0.0.0.0/0"]
+
+  enable_https    = var.enable_alb_https
+  certificate_arn = var.acm_certificate_arn
+}
+
+#ASG module
+module "asg" {
+  source = "./modules/asg"
+
+  project_name = var.project_name
+  environment  = var.environment
+  tags         = var.tags
+
+  ami           = var.ami
+  instance_type = var.instance_type
+
+  security_group_ids = [module.security_groups.web_security_group_id]
+  subnet_ids         = module.vpc.public_subnet_ids
+  target_group_arns  = [module.alb.target_group_arn]
+
+  user_data_script = <<-EOF
+  #!/bin/bash
+  apt-get update -y
+  apt-get install -y nginx
+  systemctl start nginx
+  systemctl enable nginx
+  EOF
+
+  min_size               = var.asg_min_size
+  max_size               = var.asg_max_size
+  desired_capacity       = var.asg_desired_capacity
+  target_cpu_utilization = var.asg_target_cpu_utilization
+}
+
+
+module "lambda_s3_tracker" {
+  source = "./modules/lambda_s3_tracker"
+
+  project_name = var.project_name
+  environment  = var.environment
+  tags         = var.tags
+
+  s3_bucket_id  = module.s3.bucket_id
+  s3_bucket_arn = module.s3.bucket_arn
+
+  log_retention_days = var.s3_tracker_log_retention_days
 }

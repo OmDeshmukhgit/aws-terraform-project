@@ -1,4 +1,3 @@
-# General Project Outputs
 output "aws_region" {
   description = "AWS region being used"
   value       = var.aws_region
@@ -46,21 +45,6 @@ output "security_group_id" {
   value       = module.security_groups.web_security_group_name
 }
 
-# EC2 Instance Outputs
-output "instance_id" {
-  description = "ID of the EC2 instance"
-  value       = module.ec2.instance_id
-}
-
-output "public_ip" {
-  description = "Public IP address of the EC2 instance"
-  value       = module.ec2.public_ip
-}
-
-output "private_ip" {
-  description = "Private IP address of the EC2 instance"
-  value       = module.ec2.private_ip
-}
 
 variable "public_subnet_cidrs" {
   description = "List of public subnet CIDRs"
@@ -72,9 +56,52 @@ variable "private_subnet_cidrs" {
   type        = list(string)
 }
 
-
 # S3 Bucket Outputs
 output "s3_bucket_name" {
   description = "Name of the S3 bucket"
   value       = module.s3.bucket_id
+}
+output "alb_dns_name" {
+  description = "Public DNS name of the load balancer - open this in a browser"
+  value       = module.alb.alb_dns_name
+}
+output "s3_bucket_arn" {
+  description = "ARN of the S3 bucket from the S3 module"
+  value       = module.s3.bucket_arn
+}
+
+output "alb_arn" {
+  description = "ARN of the Application Load Balancer"
+  value       = module.alb.alb_arn
+}
+
+output "asg_name" {
+  description = "Name of the Auto Scaling Group"
+  value       = module.asg.asg_name
+}
+
+output "s3_tracker_lambda_name" {
+  description = "Name of the Lambda function tracking S3 bucket operations"
+  value       = module.lambda_s3_tracker.lambda_function_name
+}
+
+output "s3_tracker_log_group" {
+  description = "CloudWatch Log Group with the S3 operation logs"
+  value       = module.lambda_s3_tracker.log_group_name
+}
+
+output "asg_key_pair_name" {
+  description = "Name of the auto-generated key pair used by ASG instances"
+  value       = module.asg.key_pair_name
+}
+
+output "asg_private_key_pem" {
+  description = "Private key for SSH access to ASG instances. Retrieve with: terraform output -raw asg_private_key_pem > key.pem && chmod 400 key.pem"
+  value       = module.asg.private_key_pem
+  sensitive   = true
+}
+
+output "ssm_connect_hint" {
+  description = "How to connect to a running ASG instance without SSH"
+  value       = "aws ssm start-session --target <instance-id>   (get instance IDs via: aws autoscaling describe-auto-scaling-groups --auto-scaling-group-name ${var.project_name}-${var.environment}-asg --query 'AutoScalingGroups[0].Instances[].InstanceId' --output text)"
 }

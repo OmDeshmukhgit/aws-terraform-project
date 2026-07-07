@@ -5,7 +5,7 @@ output "web_security_group_id" {
 
 output "web_security_group_name" {
   description = "Name of the web security group"
-  value       = aws_security_group.web_security_group_name.id
+  value       = aws_security_group.web_security_group_name.name
 }
 
 output "database_security_group_id" {

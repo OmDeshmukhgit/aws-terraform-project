@@ -1,92 +1,117 @@
-# Fetch available AZs dynamically
 data "aws_availability_zones" "available" {
   state = "available"
 }
 
-# VPC
-resource "aws_vpc" "main" {
+locals {
+  common_tags = merge(var.tags, {
+    Environment = var.environment
+    Project     = var.project_name
+    ManagedBy   = "terraform"
+  })
+
+  public_subnets = {
+    for idx, cidr in var.public_subnet_cidrs :
+    cidr => {
+      cidr_block = cidr
+      az         = element(data.aws_availability_zones.available.names, idx)
+    }
+  }
+
+  private_subnets = {
+    for idx, cidr in var.private_subnet_cidrs :
+    cidr => {
+      cidr_block = cidr
+      az         = element(data.aws_availability_zones.available.names, idx)
+    }
+  }
+}
+# --- VPC ---
+resource "aws_vpc" "this" {
   cidr_block           = var.vpc_cidr
-  enable_dns_hostnames = var.enable_dns_hostnames
-  enable_dns_support   = var.enable_dns_support
+  enable_dns_support   = true
+  enable_dns_hostnames = true
 
-  tags = merge(var.tags, {
-    Name        = "${var.project_name}-${var.environment}-vpc"
-    Environment = var.environment
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-${var.environment}-vpc"
   })
 }
 
-# Internet Gateway
-resource "aws_internet_gateway" "igw_id" {
-  vpc_id = aws_vpc.main.id
+# --- Internet Gateway ---
 
-  tags = merge(var.tags, {
-    Name        = "${var.project_name}-${var.environment}-igw"
-    Environment = var.environment
+resource "aws_internet_gateway" "this" {
+  vpc_id = aws_vpc.this.id
+
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-${var.environment}-igw"
   })
 }
 
-# Public Subnets
+# --- Public subnets ---
+
 resource "aws_subnet" "public" {
-  count                   = length(var.public_subnet_cidrs)
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = var.public_subnet_cidrs[count.index]
-  availability_zone       = data.aws_availability_zones.available.names[count.index]
+  for_each = local.public_subnets
+
+  vpc_id                  = aws_vpc.this.id
+  cidr_block              = each.value.cidr_block
+  availability_zone       = each.value.az
   map_public_ip_on_launch = true
 
-  tags = merge(var.tags, {
-    Name        = "${var.project_name}-${var.environment}-public-subnet-${count.index + 1}"
-    Environment = var.environment
-    Type        = "Public"
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-${var.environment}-public-${each.value.az}"
+    Tier = "public"
   })
 }
 
-# Private Subnets
+# --- Private subnets ---
+
 resource "aws_subnet" "private" {
-  count             = length(var.private_subnet_cidrs)
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = var.private_subnet_cidrs[count.index]
-  availability_zone = data.aws_availability_zones.available.names[count.index]
+  for_each = local.private_subnets
 
-  tags = merge(var.tags, {
-    Name        = "${var.project_name}-${var.environment}-private-subnet-${count.index + 1}"
-    Environment = var.environment
-    Type        = "Private"
+  vpc_id            = aws_vpc.this.id
+  cidr_block        = each.value.cidr_block
+  availability_zone = each.value.az
+
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-${var.environment}-private-${each.value.az}"
+    Tier = "private"
   })
 }
 
-# Public Route Table + Association
+# --- Public route table ---
+
 resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.main.id
+  vpc_id = aws_vpc.this.id
 
   route {
     cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.igw_id.id
+    gateway_id = aws_internet_gateway.this.id
   }
 
-  tags = merge(var.tags, {
-    Name        = "${var.project_name}-${var.environment}-public-rt"
-    Environment = var.environment
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-${var.environment}-public-rt"
   })
 }
 
 resource "aws_route_table_association" "public" {
-  count          = length(aws_subnet.public)
-  subnet_id      = aws_subnet.public[count.index].id
+  for_each = aws_subnet.public
+
+  subnet_id      = each.value.id
   route_table_id = aws_route_table.public.id
 }
 
-# Private Route Table + Association
-resource "aws_route_table" "private" {
-  vpc_id = aws_vpc.main.id
+# --- Private route table  ---
 
-  tags = merge(var.tags, {
-    Name        = "${var.project_name}-${var.environment}-private-rt"
-    Environment = var.environment
+resource "aws_route_table" "private" {
+  vpc_id = aws_vpc.this.id
+
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-${var.environment}-private-rt"
   })
 }
 
 resource "aws_route_table_association" "private" {
-  count          = length(aws_subnet.private)
-  subnet_id      = aws_subnet.private[count.index].id
+  for_each = aws_subnet.private
+
+  subnet_id      = each.value.id
   route_table_id = aws_route_table.private.id
 }

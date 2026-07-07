@@ -11,42 +11,35 @@ resource "aws_security_group" "web_security_group_name" {
   })
 }
 
-# Inbound Rules for Web SG
-resource "aws_vpc_security_group_ingress_rule" "ssh" {
-  security_group_id = aws_security_group.web_security_group_name.id
-  description       = "SSH access from allowed CIDRs"
-  from_port         = 22
-  to_port           = 22
-  ip_protocol       = "tcp"
-  cidr_ipv4         = var.allowed_ssh_cidr[0]
+locals {
+  web_ingress_flat = merge([
+    for rule_name, rule in var.web_ingress_rules : {
+      for idx, cidr in rule.cidr_blocks :
+      "${rule_name}-${idx}" => {
+        port     = rule.port
+        protocol = rule.protocol
+        cidr     = cidr
+      }
+    }
+  ]...)
 }
 
-resource "aws_vpc_security_group_ingress_rule" "http" {
+resource "aws_vpc_security_group_ingress_rule" "web" {
+  for_each          = local.web_ingress_flat
   security_group_id = aws_security_group.web_security_group_name.id
-  description       = "HTTP access from internet"
-  from_port         = 80
-  to_port           = 80
-  ip_protocol       = "tcp"
-  cidr_ipv4         = var.allowed_http_cidr[0]
-}
-
-resource "aws_vpc_security_group_ingress_rule" "https" {
-  security_group_id = aws_security_group.web_security_group_name.id
-  description       = "HTTPS access from internet"
-  from_port         = 443
-  to_port           = 443
-  ip_protocol       = "tcp"
-  cidr_ipv4         = var.allowed_https_cidr[0]
+  from_port         = each.value.port
+  to_port           = each.value.port
+  ip_protocol       = each.value.protocol
+  cidr_ipv4         = each.value.cidr
+  description       = each.key
 }
 
 # Outbound Rule for Web SG
 resource "aws_vpc_security_group_egress_rule" "web_allow_all" {
   security_group_id = aws_security_group.web_security_group_name.id
-  description       = "Allow all outbound traffic"
-  from_port         = 0
-  to_port           = 65535
-  ip_protocol       = "tcp"
-  cidr_ipv4         = "0.0.0.0/0"
+  description        = "Allow all outbound traffic"
+  ip_protocol        = "-1" 
+  cidr_ipv4          = "0.0.0.0/0"
 }
 
 # Database Security Group
@@ -76,8 +69,6 @@ resource "aws_vpc_security_group_ingress_rule" "mysql_from_web" {
 resource "aws_vpc_security_group_egress_rule" "db_allow_all" {
   security_group_id = aws_security_group.database.id
   description       = "Allow all outbound traffic"
-  from_port         = 0
-  to_port           = 65535
-  ip_protocol       = "tcp"
+  ip_protocol       = "-1" 
   cidr_ipv4         = "0.0.0.0/0"
 }

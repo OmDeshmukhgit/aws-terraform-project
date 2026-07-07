@@ -47,7 +47,23 @@ variable "instance_type" {
 variable "ami" {
   description = "AMI ID for EC2 instances"
   type        = string
-  default     = "ami-12345678"
+  default     = "ami-01a00762f46d584a1"
+}
+
+
+variable "web_ingress_rules" {
+  description = "Ingress rules for web security group"
+
+  type = map(object({
+    port        = number
+    protocol    = string
+    cidr_blocks = list(string)
+  }))
+  default = {
+    ssh   = { port = 22, protocol = "tcp", cidr_blocks = ["0.0.0.0/0"] }
+    http  = { port = 80, protocol = "tcp", cidr_blocks = ["0.0.0.0/0"] }
+    https = { port = 443, protocol = "tcp", cidr_blocks = ["0.0.0.0/0"] }
+  }
 }
 
 variable "tags" {
@@ -56,6 +72,47 @@ variable "tags" {
   default = {
     Project     = "Terraform AWS Project"
     ManagedBy   = "Terraform"
-    CreatedDate = "2026-07-03"
+    CreatedDate = "2026-07-07"
   }
+}
+variable "asg_min_size" {
+  description = "Minimum number of instances in the Auto Scaling Group"
+  type        = number
+  default     = 1
+}
+
+variable "asg_max_size" {
+  description = "Maximum number of instances in the Auto Scaling Group"
+  type        = number
+  default     = 3
+}
+
+variable "asg_desired_capacity" {
+  description = "Desired number of instances in the Auto Scaling Group"
+  type        = number
+  default     = 2
+}
+
+variable "asg_target_cpu_utilization" {
+  description = "Target average CPU utilization (%) that drives ASG scaling"
+  type        = number
+  default     = 60
+}
+
+variable "enable_alb_https" {
+  description = "Whether to create an HTTPS listener on the ALB (requires acm_certificate_arn)"
+  type        = bool
+  default     = false
+}
+
+variable "acm_certificate_arn" {
+  description = "ACM certificate ARN for the ALB HTTPS listener"
+  type        = string
+  default     = ""
+}
+
+variable "s3_tracker_log_retention_days" {
+  description = "CloudWatch Logs retention (days) for the S3-tracking Lambda"
+  type        = number
+  default     = 14
 }
